@@ -1,0 +1,666 @@
+{
+  "name": "Remotive Jobs -> Airtable Sync",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "f35fdcfa-d50c-4450-9a11-af7b37043f71",
+      "name": "Manual Trigger (for demo)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "1053a996-d2d7-4f9e-9ca3-34b130ae5dfd",
+      "name": "Daily Schedule (9am)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://remotive.com/api/remote-jobs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search",
+              "value": "automation"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1a20d680-75c1-4b1a-b982-2d3b56ec3703",
+      "name": "Fetch Remotive Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        272,
+        112
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-valid-jobs-array",
+              "leftValue": "={{ Array.isArray($json.jobs) && $json.jobs.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9df36da8-35c9-4d81-8d09-bfbcef11889d",
+      "name": "Validate Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        512,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "jobs",
+        "options": {}
+      },
+      "id": "079b31dd-320a-4210-af37-b8f61790baaa",
+      "name": "Split Out Jobs",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        752,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "Job Title",
+              "type": "string",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "id": "f2",
+              "name": "Company Name",
+              "type": "string",
+              "value": "={{ $json.company_name }}"
+            },
+            {
+              "id": "f3",
+              "name": "Category",
+              "type": "string",
+              "value": "={{ $json.category }}"
+            },
+            {
+              "id": "f4",
+              "name": "Employment Type",
+              "type": "string",
+              "value": "={{ $json.job_type }}"
+            },
+            {
+              "id": "f5",
+              "name": "Candidate Required Location",
+              "type": "string",
+              "value": "={{ $json.candidate_required_location }}"
+            },
+            {
+              "id": "f6",
+              "name": "Publication Date",
+              "type": "string",
+              "value": "={{ $json.publication_date ? $json.publication_date.split('T')[0] : '' }}"
+            },
+            {
+              "id": "f7",
+              "name": "Listing URL",
+              "type": "string",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "id": "f8",
+              "name": "Remotive Job ID",
+              "type": "string",
+              "value": "={{ $json.id ? $json.id.toString() : '' }}"
+            },
+            {
+              "id": "f9",
+              "name": "Salary",
+              "type": "string",
+              "value": "={{ $json.salary && $json.salary.length ? $json.salary : 'Not specified' }}"
+            },
+            {
+              "id": "f10",
+              "name": "Description (Trimmed)",
+              "type": "string",
+              "value": "={{ ($json.description || '').replace(/<[^>]*>/g, '').slice(0, 500) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c6ebd247-5eaf-4e69-a113-0169b0691986",
+      "name": "Map + Clean Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        992,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_BASE_ID",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_IMPORTED_JOBS_TABLE_ID",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Job Title": "={{ $json['Job Title'] }}",
+            "Company Name": "={{ $json['Company Name'] }}",
+            "Category": "={{ $json.Category }}",
+            "Employment Type": "={{ $json['Employment Type'] }}",
+            "Listing URL": "={{ $json['Listing URL'] }}",
+            "Publication Date": "={{ $json['Publication Date'] }}",
+            "Remotive Job ID": "={{ $json['Remotive Job ID'] }}",
+            "Description": "={{ $json['Description (Trimmed)'] }}",
+            "Candidate Required Location": "={{ $json['Candidate Required Location'] }}",
+            "Salary": "={{ $json.Salary }}"
+          },
+          "matchingColumns": [
+            "Remotive Job ID"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Employment Type",
+              "displayName": "Employment Type",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "full_time",
+                  "value": "full_time"
+                },
+                {
+                  "name": "part_time",
+                  "value": "part_time"
+                },
+                {
+                  "name": "contract",
+                  "value": "contract"
+                },
+                {
+                  "name": "freelance",
+                  "value": "freelance"
+                },
+                {
+                  "name": "internship",
+                  "value": "internship"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Candidate Required Location",
+              "displayName": "Candidate Required Location",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Publication Date",
+              "displayName": "Publication Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Listing URL",
+              "displayName": "Listing URL",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Remotive Job ID",
+              "displayName": "Remotive Job ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Salary",
+              "displayName": "Salary",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Description",
+              "displayName": "Description",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Linked Client",
+              "displayName": "Linked Client",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "4c7b01ea-52f2-49ae-9f3e-08d25df963d2",
+      "name": "Upsert into Airtable (dedupe)",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1232,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const count = items.length;\nreturn [{ json: { runStatus: 'Success', message: `Import completed successfully. ${count} job(s) processed (new records created, existing ones updated by Remotive Job ID).`, jobsProcessed: count } }];"
+      },
+      "id": "5685089f-9779-4f34-803b-efd0f78474a1",
+      "name": "Summarize Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_BASE_ID",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_SYNC_LOG_TABLE_ID",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Run Status": "={{ $json.runStatus }}",
+            "Message": "={{ $json.message }}",
+            "Jobs Processed": "={{ $json.jobsProcessed }}",
+            "Run Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Run Timestamp",
+              "displayName": "Run Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Run Status",
+              "displayName": "Run Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Jobs Processed",
+              "displayName": "Jobs Processed",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "cc89caa3-85f2-4b41-875b-b549c82e94b7",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1712,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_BASE_ID",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "YOUR_SYNC_LOG_TABLE_ID",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Run Status": "Failed",
+            "Message": "={{ 'Remotive API did not return a valid jobs array. Raw response (truncated): ' + JSON.stringify($json).slice(0, 300) }}",
+            "Jobs Processed": 0,
+            "Run Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Run Timestamp",
+              "displayName": "Run Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Run Status",
+              "displayName": "Run Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Jobs Processed",
+              "displayName": "Jobs Processed",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ee9fa7e3-8f59-471f-99f0-1f75f77dd35a",
+      "name": "Log Failure",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        752,
+        272
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger (for demo)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Remotive Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule (9am)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Remotive Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Remotive Jobs": {
+      "main": [
+        [
+          {
+            "node": "Validate Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Response": {
+      "main": [
+        [
+          {
+            "node": "Split Out Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Jobs": {
+      "main": [
+        [
+          {
+            "node": "Map + Clean Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map + Clean Fields": {
+      "main": [
+        [
+          {
+            "node": "Upsert into Airtable (dedupe)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert into Airtable (dedupe)": {
+      "main": [
+        [
+          {
+            "node": "Summarize Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Run": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
